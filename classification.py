@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-
+import warnings
+warnings.filterwarnings("ignore")
+from numpy.core.umath_tests import inner1d
 import argparse as ap
 import matplotlib
 matplotlib.use('Agg')
@@ -10,12 +12,13 @@ import sys
 from sklearn import decomposition
 from sklearn import metrics
 from sklearn import preprocessing as prep
-from sklearn.cross_validation import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LassoCV
 from sklearn.linear_model import ElasticNetCV
 from sklearn.svm import SVC
+
 
 class class_metrics:
 	def __init__(self):
@@ -41,7 +44,6 @@ class feature_importance:
 		self.feat_sel = feat
 		self.imp = np.array([p]*len(feat))
 
-
 def compute_feature_importance(el, feat, feat_sel, ltype):
 	fi = feature_importance(feat, 0.0)
 	if ltype == 'rf':
@@ -59,9 +61,9 @@ def compute_feature_importance(el, feat, feat_sel, ltype):
 	return fi
 
 def plot_pca(f, l, feat_sel):
-	f = f[feat_sel].values	
+	f = f[feat_sel].values
 	l = l.values.flatten().astype('int')
-	
+
 	pca = decomposition.PCA(n_components=2)
 	pca = pca.fit(f)
 	ft = pca.transform(f)
@@ -74,8 +76,8 @@ def plot_pca(f, l, feat_sel):
 	ax.set_xlabel('PC1 (' + str(np.round(100*pca.explained_variance_ratio_[0], decimals=2)) + '%)')
 	ax.set_ylabel('PC2 (' + str(np.round(100*pca.explained_variance_ratio_[1], decimals=2)) + '%)')
 	ax.set_xlim([min(ft[:, 0]),max(ft[:, 0])])
-	ax.set_ylim([min(ft[:, 1]),max(ft[:, 1])])	
-	
+	ax.set_ylim([min(ft[:, 1]),max(ft[:, 1])])
+
 	fig.savefig(par['out_f'] + '_pca.' + par['figure_extension'], bbox_inches='tight')
 
 def read_params(args):
@@ -103,7 +105,7 @@ def read_params(args):
 	arg( '-j','--fs_grid', type=str, help="the parameter grid for feature selection\n")
 
 	arg( '-e','--figure_extension', default='png', type=str, help="the extension of output figure\n")
-	
+
 	return vars(parser.parse_args())
 
 def save_average_feature_importance(fi, feat):
@@ -128,7 +130,7 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
 	if par['out_f']:
 		fidoutes.write('#features\t' + str(nf) + '\n')
 		if n_clts == 2:
-			fidoutroc.write('#features\t' + str(nf) + '\n')	
+			fidoutroc.write('#features\t' + str(nf) + '\n')
 
 	for j in range(runs_n*runs_cv_folds):
 		l_ = pd.DataFrame([l.loc[i] for i in l[~i_tr[j] & i_u[j/runs_cv_folds]].index]).values.flatten().astype('int')
@@ -163,14 +165,14 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
 			if n_clts <= 2:
 				fidoutes.write('\nestimated probabilities\t')
 				[fidoutes.write(str(i)+'\t') for i in p_es_pos_]
-			fidoutes.write('\nsample index\t')			
+			fidoutes.write('\nsample index\t')
 			[fidoutes.write(str(i)+'\t') for i in ii_ts_]
 			fidoutes.write('\n')
 
 	fidout.write('#samples\t' + str(sum(sum(i_u))/len(i_u)))
 	fidout.write('\n#features\t' + str(nf))
 	fidout.write('\n#runs\t' + str(runs_n))
-	fidout.write('\n#runs_cv_folds\t' + str(runs_cv_folds))	
+	fidout.write('\n#runs_cv_folds\t' + str(runs_cv_folds))
 
 	fidout.write('\naccuracy\t' + str(np.mean(cm.accuracy)) + '\t' + str(np.std(cm.accuracy)))
 	fidout.write('\nf1\t' + str(np.mean(cm.f1)) + '\t' + str(np.std(cm.f1)))
@@ -197,9 +199,7 @@ def set_class_params(args, l):
 	if par['learner_type']:
 		lp.learner_type = par['learner_type']
 		if (max(l.values.flatten().astype('int'))>1) & (lp.learner_type != 'svm'):
-			lp.learner_type = 'rf'	
-
-
+			lp.learner_type = 'rf'
 	else:
 		lp.learner_type = 'rf'
 
@@ -234,7 +234,7 @@ def set_class_params(args, l):
 		lp.fs_grid = [np.logspace(-4, -0.5, 50)]
 	elif lp.feature_selection == 'enet':
 		lp.fs_grid = [np.logspace(-4, -0.5, 50), [0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0]]
-	
+
 	if par['cv_scoring']:
 		lp.cv_scoring = par['cv_scoring']
 	elif lp.learner_type == 'svm':
@@ -245,7 +245,7 @@ def set_class_params(args, l):
 if __name__ == "__main__":
 	par = read_params(sys.argv)
 
-	f = pd.read_csv(par['inp_f'], sep='\t', header=None, index_col=0, dtype=unicode)
+	f = pd.read_csv(par['inp_f'], sep='\t', header=None, index_col=0)
 	f = f.T
 
 	if par['out_f']:
@@ -324,10 +324,10 @@ if __name__ == "__main__":
 		if lp.feature_selection == 'lasso':
 			fi[j] = compute_feature_importance(LassoCV(alphas=lp.fs_grid[0], cv=lp.cv_folds, n_jobs=-1).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')), feat, fi[j].feat_sel, lp.feature_selection)
 		elif lp.feature_selection == 'enet':
-			fi[j] = compute_feature_importance(ElasticNetCV(alphas=lp.fs_grid[0], l1_ratio=lp.fs_grid[1], cv=lp.cv_folds, n_jobs=-1).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')), feat, fi[j].feat_sel, lp.feature_selection)			
+			fi[j] = compute_feature_importance(ElasticNetCV(alphas=lp.fs_grid[0], l1_ratio=lp.fs_grid[1], cv=lp.cv_folds, n_jobs=-1).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')), feat, fi[j].feat_sel, lp.feature_selection)
 
 		if lp.learner_type == 'rf':
-			clf.append(RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')))			
+			clf.append(RandomForestClassifier(n_estimators=500, max_depth=None, min_samples_split=2, n_jobs=-1).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')))
 		elif lp.learner_type == 'svm':
 			clf.append(GridSearchCV(SVC(C=1, probability=True), lp.cv_grid, cv=StratifiedKFold(l.iloc[i_tr[j] & i_u[j/runs_cv_folds],0], lp.cv_folds, shuffle=True), scoring=lp.cv_scoring).fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values, l[i_tr[j] & i_u[j/runs_cv_folds]].values.flatten().astype('int')))
 		elif lp.learner_type == 'lasso':
@@ -340,7 +340,7 @@ if __name__ == "__main__":
 		else:
 			p_es.append(pd.DataFrame(clf[j].predict(f.loc[~i_tr[j] & i_u[j/runs_cv_folds], fi[j].feat_sel].values)))
 			l_es.append(pd.DataFrame([int(p_es[j].iloc[i]>0.5) for i in range(len(p_es[j]))]))
-		
+
 	cm = save_results(l, l_es, p_es, i_tr, i_u, len(feat), runs_n, runs_cv_folds)
 	fi_f = []
 	for j in range(runs_n*runs_cv_folds):

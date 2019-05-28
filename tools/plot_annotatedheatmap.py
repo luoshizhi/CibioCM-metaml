@@ -40,9 +40,9 @@ class plot_par:
 def isfloat(value):
 	try:
 		float(value)
-    		return True
-  	except ValueError:
-    		return False
+		return True
+	except ValueError:
+		return False
 
 def read_params(args):
 	parser = ap.ArgumentParser(description='Plot annotated heatmap')
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 	par = read_params(sys.argv)
 	plot_par = plot_par()
 
-	f = pd.read_csv(par['inp_f'], sep='\t', header=None, index_col=None, dtype=unicode)
+	f = pd.read_csv(par['inp_f'], sep='\t', header=None, index_col=None)
 
 	fm = pd.DataFrame(data=np.nan, index=range(f.shape[0]-plot_par.xticks_n), columns=range(f.shape[1]-plot_par.yticks_n))
 	for i in range(f.shape[0]-plot_par.xticks_n):
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 				plt.plot([-0.5, f.shape[1]-plot_par.yticks_n-0.5], [i+0.5, i+0.5], c=plot_par.lin_c[0], ls=plot_par.lin_ls[0], lw=plot_par.lin_lw[0])
 		if plot_par.yticks_n == 2:
 			if f.iloc[i,1] != f.iloc[i+1,1]:
-				plt.plot([-0.5, f.shape[1]-plot_par.yticks_n-0.5], [i+0.5, i+0.5], c=plot_par.lin_c[1], ls=plot_par.lin_ls[1], lw=plot_par.lin_lw[1])			
+				plt.plot([-0.5, f.shape[1]-plot_par.yticks_n-0.5], [i+0.5, i+0.5], c=plot_par.lin_c[1], ls=plot_par.lin_ls[1], lw=plot_par.lin_lw[1])
 
 	xticks = [[s-plot_par.yticks_n for s in range(plot_par.yticks_n,f.shape[1]) if f.iloc[-1,s] != '*empty'] for s2 in range(plot_par.xticks_n)]
 	xticklabels = [[f.iloc[-1-s2,s+plot_par.yticks_n] for s in xticks[s2]] for s2 in range(plot_par.xticks_n)]
@@ -136,7 +136,7 @@ if __name__ == "__main__":
 	ax.set_xticks(xticks_u)
 	ax.set_xticklabels(xticklabels_u, size=plot_par.text_size)
 	for i, j in zip(ax.get_xticklabels(), xticks_us):
-		i.set_y(1+plot_par.ticks_spacing*(plot_par.xticks_n-j-1))		
+		i.set_y(1+plot_par.ticks_spacing*(plot_par.xticks_n-j-1))
 
 	yticks = [[s for s in range(f.shape[0]-plot_par.xticks_n) if f.iloc[s,0] != '*empty'] for s2 in range(plot_par.yticks_n)]
 	yticklabels = [[f.iloc[s,s2] for s in yticks[s2]] for s2 in range(plot_par.yticks_n)]
