@@ -4,7 +4,8 @@ from sklearn.linear_model import ElasticNetCV
 from sklearn.linear_model import LassoCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import StratifiedKFold
+# from sklearn.model_selection import StratifiedKFold
+from sklearn.cross_validation import StratifiedKFold
 from sklearn import preprocessing as prep
 from sklearn import metrics
 from sklearn import decomposition
@@ -14,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import argparse as ap
+from sklearn.utils.multiclass import type_of_target
 # from numpy.core.umath_tests import inner1d
 import warnings
 warnings.filterwarnings("ignore")
@@ -371,10 +373,23 @@ if __name__ == "__main__":
                 ii_u = range(len(f.index))
             if par['set_seed']:
                 skf = StratifiedKFold(
-                    l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True, random_state=j)
+                   l.iloc[i_u.values.T[j], 0], runs_cv_folds,
+                   shuffle=True, random_state=j)
+                #skf = StratifiedKFold(
+                #        runs_cv_folds, shuffle=True, random_state=j)
             else:
                 skf = StratifiedKFold(
-                    l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True)
+                     l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True)
+            #    skf = StratifiedKFold(runs_cv_folds, shuffle=True)
+            y_target = l.iloc[i_u.values.T[j], 0]
+            #x_placeholder = np.zeros(len(y_target))
+            #i = -1
+            #print([i for i in y_target])
+            #print("y_target",type_of_target(list(y_target)))
+            #for train_index, test_index in skf.split(x_placeholder, list(y_target)):
+            #    i += 1
+            #    for s in test_index:
+            #        i_tr[j*runs_cv_folds+i][ii_u[s]] = False
             for i in range(runs_cv_folds):
                 for s in np.where(skf.test_folds == i)[0]:
                     i_tr[j*runs_cv_folds+i][ii_u[s]] = False
