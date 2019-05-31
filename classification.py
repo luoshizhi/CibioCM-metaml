@@ -460,7 +460,6 @@ if __name__ == "__main__":
                     SVC(C=1, probability=True),
                     lp.cv_grid,
                     cv=StratifiedKFold(
-                        l.iloc[i_tr[j] & i_u[int(j/runs_cv_folds)], 0],
                         lp.cv_folds,
                         shuffle=True),
                     scoring=lp.cv_scoring)
