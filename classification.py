@@ -1,10 +1,14 @@
 #!/usr/bin/env python
+import warnings
+warnings.filterwarnings("ignore")
+from numpy.core.umath_tests import inner1d
 from sklearn.svm import SVC
 from sklearn.linear_model import ElasticNetCV
 from sklearn.linear_model import LassoCV
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold
+#from sklearn.cross_validation import StratifiedKFold
 from sklearn import preprocessing as prep
 from sklearn import metrics
 from sklearn import decomposition
@@ -14,9 +18,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import argparse as ap
-# from numpy.core.umath_tests import inner1d
-import warnings
-warnings.filterwarnings("ignore")
 matplotlib.use('Agg')
 
 
@@ -174,7 +175,7 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
 
     for j in range(runs_n*runs_cv_folds):
         l_ = pd.DataFrame(
-            [l.loc[i] for i in l[~i_tr[j] & i_u[j / runs_cv_folds]].index]
+            l.loc[l[~i_tr[j] & i_u[int(j / runs_cv_folds)]].index]
         ).values.flatten().astype('int')
         l_es_ = l_es[j].values.flatten().astype('int')
         if (lp.learner_type == 'rf') | (lp.learner_type == 'svm'):
@@ -194,7 +195,7 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
             if n_clts == 2:
                 cm.auc.append(metrics.roc_auc_score(l_, p_es_pos_))
                 cm.roc_curve.append(metrics.roc_curve(l_, p_es_pos_))
-                fidoutroc.write('run/fold\t' + str(j/runs_cv_folds) +
+                fidoutroc.write('run/fold\t' + str(int(j/runs_cv_folds)) +
                                 '/' + str(j % runs_cv_folds) + '\n')
                 for i in range(len(cm.roc_curve[-1])):
                     for i2 in range(len(cm.roc_curve[-1][i])):
@@ -204,7 +205,7 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
                 l_, l_es_, labels=np.unique(l.astype('int'))))
 
         if par['out_f']:
-            fidoutes.write('run/fold\t' + str(j/runs_cv_folds) +
+            fidoutes.write('run/fold\t' + str(int(j/runs_cv_folds)) +
                            '/' + str(j % runs_cv_folds))
             fidoutes.write('\ntrue labels\t')
             [fidoutes.write(str(i)+'\t') for i in l_]
@@ -217,7 +218,7 @@ def save_results(l, l_es, p_es, i_tr, i_u, nf, runs_n, runs_cv_folds):
             [fidoutes.write(str(i)+'\t') for i in ii_ts_]
             fidoutes.write('\n')
 
-    fidout.write('#samples\t' + str(sum(sum(i_u))/len(i_u)))
+    fidout.write('#samples\t' + str(int(sum(sum(i_u))/len(i_u))))
     fidout.write('\n#features\t' + str(nf))
     fidout.write('\n#runs\t' + str(runs_n))
     fidout.write('\n#runs_cv_folds\t' + str(runs_cv_folds))
@@ -310,7 +311,7 @@ def set_class_params(args, l):
 
 if __name__ == "__main__":
     par = read_params(sys.argv)
-
+    print(par)
     f = pd.read_csv(par['inp_f'], sep='\t', header=None, index_col=0)
     f = f.T
 
@@ -326,13 +327,16 @@ if __name__ == "__main__":
 
     if par['define']:
         d = pd.DataFrame([s.split(':') for s in par['define'].split(',')])
+        # 将-d获取的第一个字符变为数值型，否则后续的y会有数值和字符型，在StratifiedKFold时报错
+        d.iloc[:, 0] = int(d.iloc[:, 0])
         l = pd.DataFrame([0]*len(f))
         for i in range(len(d)):
             l[(f[d.iloc[i, 1]].isin(d.iloc[i, 2:])).tolist()] = d.iloc[i, 0]
     else:
         le = prep.LabelEncoder()
-        le.fit(f.iloc[:, 0])
-        l = pd.DataFrame(le.transform(f.iloc[:, 0]))
+        # le.fit(f.iloc[:, 0])
+        # l = pd.DataFrame(le.transform(f.iloc[:, 0]))
+        l = pd.DataFrame(le.fit_transform(f.iloc[:, 0]))
 
     runs_n = par['runs_n']
     if par['target']:
@@ -370,14 +374,27 @@ if __name__ == "__main__":
             else:
                 ii_u = range(len(f.index))
             if par['set_seed']:
+                # 更新StratifiedKFold的用法
+                # skf = StratifiedKFold(
+                #    l.iloc[i_u.values.T[j], 0], runs_cv_folds,
+                #    shuffle=True, random_state=j)
                 skf = StratifiedKFold(
-                    l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True, random_state=j)
+                        runs_cv_folds, shuffle=True, random_state=j)
             else:
-                skf = StratifiedKFold(
-                    l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True)
-            for i in range(runs_cv_folds):
-                for s in np.where(skf.test_folds == i)[0]:
+                # skf = StratifiedKFold(
+                #     l.iloc[i_u.values.T[j], 0], runs_cv_folds, shuffle=True)
+                skf = StratifiedKFold(runs_cv_folds, shuffle=True)
+            y_t = l.iloc[i_u.values.T[j], 0]
+            x_t = np.zeros(len(y_t))
+            # print([i for i in y_target])
+            # print("y_target",type_of_target(list(y_target)))
+            # 更新StratifiedKFold的用法
+            for i, (train_index, test_index) in enumerate(skf.split(x_t, y_t)):
+                for s in test_index:
                     i_tr[j*runs_cv_folds+i][ii_u[s]] = False
+            # for i in range(runs_cv_folds):
+            #    for s in np.where(skf.test_folds == i)[0]:
+            #        i_tr[j*runs_cv_folds+i][ii_u[s]] = False
     i_tr = i_tr.values.T
     i_u = i_u.values.T
 
@@ -392,7 +409,6 @@ if __name__ == "__main__":
     f = (f-f.min())/(f.max()-f.min())
 
     lp = set_class_params(sys.argv, l)
-
     fi = []
     clf = []
     p_es = []
@@ -404,9 +420,9 @@ if __name__ == "__main__":
                 LassoCV(alphas=lp.fs_grid[0],
                         cv=lp.cv_folds,
                         n_jobs=-1)
-                .fit(f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                .fit(f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                            fi[j].feat_sel].values,
-                     l[i_tr[j] & i_u[j/runs_cv_folds]]
+                     l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                      .values.flatten().astype('int')),
                 feat,
                 fi[j].feat_sel,
@@ -419,9 +435,9 @@ if __name__ == "__main__":
                     cv=lp.cv_folds,
                     n_jobs=-1)
                 .fit(
-                    f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi[j].feat_sel].values,
-                    l[i_tr[j] & i_u[j/runs_cv_folds]]
+                    l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                     .values.flatten().astype('int')),
                 feat, fi[j].feat_sel,
                 lp.feature_selection)
@@ -434,9 +450,9 @@ if __name__ == "__main__":
                     min_samples_split=2,
                     n_jobs=-1)
                 .fit(
-                    f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi[j].feat_sel].values,
-                    l[i_tr[j] & i_u[j/runs_cv_folds]]
+                    l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                     .values.flatten().astype('int')))
         elif lp.learner_type == 'svm':
             clf.append(
@@ -444,14 +460,13 @@ if __name__ == "__main__":
                     SVC(C=1, probability=True),
                     lp.cv_grid,
                     cv=StratifiedKFold(
-                        l.iloc[i_tr[j] & i_u[j/runs_cv_folds], 0],
                         lp.cv_folds,
                         shuffle=True),
                     scoring=lp.cv_scoring)
                 .fit(
-                    f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi[j].feat_sel].values,
-                    l[i_tr[j] & i_u[j/runs_cv_folds]]
+                    l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                     .values.flatten().astype('int')))
         elif lp.learner_type == 'lasso':
             clf.append(
@@ -460,9 +475,9 @@ if __name__ == "__main__":
                     cv=lp.cv_folds,
                     n_jobs=-1)
                 .fit(
-                    f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi[j].feat_sel].values,
-                    l[i_tr[j] & i_u[j/runs_cv_folds]]
+                    l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                     .values.flatten().astype('int')))
         elif lp.learner_type == 'enet':
             clf.append(
@@ -471,23 +486,21 @@ if __name__ == "__main__":
                     l1_ratio=lp.cv_grid[1],
                     cv=lp.cv_folds, n_jobs=-1)
                 .fit(
-                    f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi[j].feat_sel].values,
-                    l[i_tr[j] & i_u[j/runs_cv_folds]]
+                    l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                     .values.flatten().astype('int')))
         if (lp.learner_type == 'rf') | (lp.learner_type == 'svm'):
             p_es.append(
                 pd.DataFrame(
                     clf[j].predict_proba(
-                        f.loc[~i_tr[j] & i_u[j/runs_cv_folds],
+                        f.loc[~i_tr[j] & i_u[int(j/runs_cv_folds)],
                               fi[j].feat_sel].values)))
-            l_es.append(pd.DataFrame(
-                [list(p_es[j].iloc[i, :]).index(
-                    max(p_es[j].iloc[i, :])) for i in range(len(p_es[j]))]))
+            l_es.append(pd.DataFrame(np.array(p_es[j]).argmax(axis=1)))
         else:
             p_es.append(pd.DataFrame(
               clf[j].predict(
-                f.loc[~i_tr[j] & i_u[j/runs_cv_folds],
+                f.loc[~i_tr[j] & i_u[int(j/runs_cv_folds)],
                       fi[j].feat_sel].values)))
             l_es.append(pd.DataFrame(
                 [int(p_es[j].iloc[i] > 0.5) for i in range(len(p_es[j]))]))
@@ -512,12 +525,12 @@ if __name__ == "__main__":
                             min_samples_split=2,
                             n_jobs=-1)
                         .fit(
-                            f.loc[i_tr[j] & i_u[j/runs_cv_folds],
+                            f.loc[i_tr[j] & i_u[int(j/runs_cv_folds)],
                                   fi_f[j].feat_sel[:k]].values,
-                            l[i_tr[j] & i_u[j/runs_cv_folds]]
+                            l[i_tr[j] & i_u[int(j/runs_cv_folds)]]
                             .values.flatten().astype('int')))
                 p_es_f.append(pd.DataFrame(clf_f[j].predict_proba(
-                    f.loc[~i_tr[j] & i_u[j/runs_cv_folds],
+                    f.loc[~i_tr[j] & i_u[int(j/runs_cv_folds)],
                           fi_f[j].feat_sel[:k]].values)))
                 l_es_f.append(pd.DataFrame([list(p_es_f[j].iloc[i, :]).index(
                   max(p_es_f[j].iloc[i, :])) for i in range(len(p_es_f[j]))]))
