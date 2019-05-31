@@ -1,3 +1,7 @@
+fix bug from out-of-date model
+
+update to python3
+
 get fork form:https://bitbucket.org/CibioCM/metaml/src
 
 more detail see:http://segatalab.cibio.unitn.it/tools/metaml/
